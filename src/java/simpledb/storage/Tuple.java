@@ -1,8 +1,11 @@
 package simpledb.storage;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -10,6 +13,9 @@ import java.util.Iterator;
  * with the data for each field.
  */
 public class Tuple implements Serializable {
+    private TupleDesc tupleDesc;
+    private RecordId rid;
+    private List<Field> fields;
 
     private static final long serialVersionUID = 1L;
 
@@ -22,6 +28,8 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         // some code goes here
+        this.tupleDesc = td;
+        this.fields = new ArrayList<>();
     }
 
     /**
@@ -29,7 +37,7 @@ public class Tuple implements Serializable {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return this.tupleDesc;
     }
 
     /**
@@ -38,7 +46,7 @@ public class Tuple implements Serializable {
      */
     public RecordId getRecordId() {
         // some code goes here
-        return null;
+        return this.rid;
     }
 
     /**
@@ -49,6 +57,7 @@ public class Tuple implements Serializable {
      */
     public void setRecordId(RecordId rid) {
         // some code goes here
+        this.rid = rid;
     }
 
     /**
@@ -61,6 +70,10 @@ public class Tuple implements Serializable {
      */
     public void setField(int i, Field f) {
         // some code goes here
+        if (i < 0 || i > fields.size())
+            return;
+
+        this.fields.add(i, f);
     }
 
     /**
@@ -71,7 +84,10 @@ public class Tuple implements Serializable {
      */
     public Field getField(int i) {
         // some code goes here
-        return null;
+        if (i < 0 || i > fields.size())
+            return null;
+
+        return this.fields.get(i);
     }
 
     /**
@@ -84,7 +100,8 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        throw new UnsupportedOperationException("Implement this");
+        return fields.stream().map(f -> f.toString())
+                .collect(Collectors.joining("\t"));
     }
 
     /**
@@ -94,7 +111,7 @@ public class Tuple implements Serializable {
     public Iterator<Field> fields()
     {
         // some code goes here
-        return null;
+        return this.fields.iterator();
     }
 
     /**
@@ -103,5 +120,6 @@ public class Tuple implements Serializable {
     public void resetTupleDesc(TupleDesc td)
     {
         // some code goes here
+        this.tupleDesc = td;
     }
 }
