@@ -7,8 +7,12 @@ import simpledb.common.DeadlockException;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,6 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Threadsafe, all fields are final
  */
 public class BufferPool {
+    private Map<PageId, Page> idPageMap;
+    private int numPages;
+
     /** Bytes per page, including header. */
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
@@ -40,6 +47,8 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
+        this.idPageMap = new HashMap<>();
+        this.numPages = numPages;
     }
     
     public static int getPageSize() {
@@ -74,7 +83,19 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        if (idPageMap.containsKey(pid))
+            return idPageMap.get(pid);
+
+        if (idPageMap.size() >= numPages) {
+            throw new DbException("more than buffer pool capacity");
+        }
+
+        // add page to buffer
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        Page page =dbFile.readPage(pid);
+        idPageMap.put(pid, page);
+
+        return page;
     }
 
     /**
