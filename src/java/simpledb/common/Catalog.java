@@ -22,6 +22,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Threadsafe
  */
 public class Catalog {
+    private Map<String, Table> nameTableMap;
+    private Map<Integer, Table> idTableMap;
+
+    private static class Table {
+        DbFile dbFile;
+        String tableName;
+        String pkeyField;
+
+        Table(DbFile dbfile, String tableName, String pkeyField) {
+            this.dbFile = dbfile;
+            this.tableName = tableName;
+            this.pkeyField = pkeyField;
+        }
+    }
 
     /**
      * Constructor.
@@ -29,6 +43,8 @@ public class Catalog {
      */
     public Catalog() {
         // some code goes here
+        nameTableMap = new ConcurrentHashMap<>();
+        idTableMap = new ConcurrentHashMap<>();
     }
 
     /**
@@ -42,6 +58,14 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
+        if (file == null || name == null)
+            return;
+
+        Table newTable = new Table(file, name, pkeyField);
+
+        // insert or update
+        nameTableMap.put(name, newTable);
+        idTableMap.put(newTable.dbFile.getId(), newTable);
     }
 
     public void addTable(DbFile file, String name) {
@@ -65,7 +89,11 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        return 0;
+        if (name == null || !nameTableMap.containsKey(name)) {
+            throw new NoSuchElementException();
+        }
+
+        return nameTableMap.get(name).dbFile.getId();
     }
 
     /**
@@ -76,7 +104,11 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
-        return null;
+        if (!idTableMap.containsKey(tableid))
+            throw new NoSuchElementException();
+
+        Table table = idTableMap.get(tableid);
+        return table.dbFile.getTupleDesc();
     }
 
     /**
@@ -87,27 +119,41 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-        return null;
+        if (!idTableMap.containsKey(tableid))
+            throw new NoSuchElementException();
+
+        Table table = idTableMap.get(tableid);
+        return table.dbFile;
     }
 
     public String getPrimaryKey(int tableid) {
         // some code goes here
-        return null;
+        if (!idTableMap.containsKey(tableid))
+            throw new NoSuchElementException();
+
+        Table table = idTableMap.get(tableid);
+        return table.pkeyField;
     }
 
     public Iterator<Integer> tableIdIterator() {
         // some code goes here
-        return null;
+        return idTableMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
         // some code goes here
-        return null;
+        if (!idTableMap.containsKey(id))
+            throw new NoSuchElementException();
+
+        Table table = idTableMap.get(id);
+        return table.tableName;
     }
     
     /** Delete all tables from the catalog */
     public void clear() {
         // some code goes here
+        idTableMap.clear();
+        nameTableMap.clear();
     }
     
     /**
