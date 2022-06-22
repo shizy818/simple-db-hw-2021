@@ -12,7 +12,6 @@ import java.util.NoSuchElementException;
 public class HeapFileIterator implements DbFileIterator {
     private TransactionId tid;
     private HeapFile heapFile;
-    private int currentPage;
     private Iterator<Tuple> tupleIterator = null;
 
     public HeapFileIterator(TransactionId tid, HeapFile file) {
@@ -47,7 +46,7 @@ public class HeapFileIterator implements DbFileIterator {
 
     @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        HeapPage heapPage = getPageByNumber(currentPage);
+        HeapPage heapPage = getPageByNumber(0);
         if (heapPage != null) {
             tupleIterator = heapPage.iterator();
         }
