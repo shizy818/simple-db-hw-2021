@@ -1,14 +1,26 @@
 package simpledb.execution;
 
+import simpledb.common.DbException;
 import simpledb.common.Type;
-import simpledb.storage.Tuple;
+import simpledb.storage.*;
+import simpledb.transaction.TransactionAbortedException;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Knows how to compute some aggregate over a set of StringFields.
  */
 public class StringAggregator implements Aggregator {
+    private int gbfield, afield;
+    private Type gbfieldtype;
+    private Op what;
+
+    // Another implementation
+    private Map<Field, Tuple> tupMap;
 
     private static final long serialVersionUID = 1L;
+    private static final Field NO_GROUPING_STRING_FIELD = new IntField(Integer.MIN_VALUE);
 
     /**
      * Aggregate constructor
@@ -21,6 +33,15 @@ public class StringAggregator implements Aggregator {
 
     public StringAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
         // some code goes here
+        if (what != Op.COUNT)
+            throw new IllegalArgumentException("Not COUNT op");
+
+        this.gbfield = gbfield;
+        this.gbfieldtype = gbfieldtype;
+        this.afield = afield;
+        this.what = what;
+
+        this.tupMap = new HashMap<>();
     }
 
     /**
@@ -29,6 +50,35 @@ public class StringAggregator implements Aggregator {
      */
     public void mergeTupleIntoGroup(Tuple tup) {
         // some code goes here
+        TupleDesc td = this.getTupleDesc();
+
+        if (gbfield != NO_GROUPING) {
+            // insert tuple into corresponding list.
+            Field key = tup.getField(gbfield);
+            if (!tupMap.containsKey(key)) {
+                Tuple newTup = new Tuple(td);
+                newTup.setField(0, key);
+                newTup.setField(1, new IntField(0));
+                tupMap.put(key, newTup);
+            }
+
+            // Calculate aggregated(count) result
+            Tuple t = tupMap.get(key);
+            int newVal = ((IntField)t.getField(1)).getValue() + 1;
+            t.setField(1, new IntField(newVal));
+        } else {
+            Field key = NO_GROUPING_STRING_FIELD;
+            if (!tupMap.containsKey(key)) {
+                Tuple newTup = new Tuple(td);
+                newTup.setField(0, new IntField(0));
+                tupMap.put(key, newTup);
+            }
+
+            // Calculate aggregated(count) result
+            Tuple t = tupMap.get(key);
+            int newVal = ((IntField)t.getField(0)).getValue() + 1;
+            t.setField(0, new IntField(newVal));
+        }
     }
 
     /**
@@ -41,7 +91,59 @@ public class StringAggregator implements Aggregator {
      */
     public OpIterator iterator() {
         // some code goes here
-        throw new UnsupportedOperationException("please implement me for lab2");
+        // TupleDesc td = this.getTupleDesc();
+        // return new TupleIterator(td, tupMap.values());
+
+        return new OpIterator() {
+            private static final long serialVersionUID = 1L;
+
+            private int pos = 0;
+            private boolean isOpen = false;
+            private Tuple[] allTuples = tupMap.values().toArray(new Tuple[tupMap.size()]);
+
+            @Override
+            public void open() throws DbException, TransactionAbortedException {
+                isOpen = true;
+                pos = 0;
+            }
+
+            @Override
+            public boolean hasNext() throws DbException, TransactionAbortedException {
+                if (!isOpen)
+                    throw new IllegalStateException("OpIterator is not open");
+                return pos >= 0 && pos < allTuples.length;
+            }
+
+            @Override
+            public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
+                if (!hasNext())
+                    throw new NoSuchElementException("Out of bound");
+                return allTuples[pos++];
+            }
+
+            @Override
+            public void rewind() throws DbException, TransactionAbortedException {
+                pos = 0;
+            }
+
+            @Override
+            public TupleDesc getTupleDesc() {
+                return getTupleDesc();
+            }
+
+            @Override
+            public void close() {
+                isOpen = false;
+            }
+        };
     }
 
+    // helper function to get tupledesc of this aggregator. It only support COUNT aggregator.
+    private TupleDesc getTupleDesc() {
+        if (this.gbfield == NO_GROUPING) {
+            return new TupleDesc(new Type[]{Type.INT_TYPE});
+        } else {
+            return new TupleDesc(new Type[]{this.gbfieldtype, Type.INT_TYPE});
+        }
+    }
 }
