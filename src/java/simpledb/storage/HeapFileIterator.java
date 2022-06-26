@@ -12,6 +12,7 @@ import java.util.NoSuchElementException;
 public class HeapFileIterator implements DbFileIterator {
     private TransactionId tid;
     private HeapFile heapFile;
+    private int pageNum;
     private Iterator<Tuple> tupleIterator = null;
 
     public HeapFileIterator(TransactionId tid, HeapFile file) {
@@ -31,6 +32,16 @@ public class HeapFileIterator implements DbFileIterator {
     public boolean hasNext() throws DbException, TransactionAbortedException {
         if (tupleIterator == null)
             return false;
+
+        if (tupleIterator.hasNext())
+            return true;
+
+        pageNum++;
+        if (pageNum >= heapFile.numPages()) {
+            return false;
+        } else {
+            tupleIterator = getPageByNumber(pageNum).iterator();
+        }
 
         return tupleIterator.hasNext();
     }
@@ -55,10 +66,11 @@ public class HeapFileIterator implements DbFileIterator {
     @Override
     public void close() {
         tupleIterator = null;
+        pageNum = 0;
     }
 
     private HeapPage getPageByNumber(int pageNum) throws DbException, TransactionAbortedException{
-        if (pageNum < 0 || pageNum >= heapFile.numPages()) {
+        if (pageNum < 0 || pageNum > heapFile.numPages()) {
             throw new DbException("Page Number is invalid : pageNumber is " + pageNum + "  numPages is " + heapFile.numPages());
         }
         HeapPageId pageId = new HeapPageId(heapFile.getId(), pageNum);

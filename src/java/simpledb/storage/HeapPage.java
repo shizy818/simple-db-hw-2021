@@ -25,6 +25,9 @@ public class HeapPage implements Page {
     final Tuple[] tuples;
     final int numSlots;
 
+    TransactionId dirtyTid;
+    boolean isDirty;
+
     byte[] oldData;
     private final Byte oldDataLock= (byte) 0;
 
@@ -250,6 +253,12 @@ public class HeapPage implements Page {
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        int slotId = t.getRecordId().getTupleNumber();
+        if (!isSlotUsed(slotId) || !pid.equals(t.getRecordId().getPageId())) {
+            throw new DbException("Tuple does not exists");
+        }
+
+        markSlotUsed(slotId, false);
     }
 
     /**
@@ -262,6 +271,20 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        if (getNumEmptySlots() == 0)
+            throw new DbException("Page is full.");
+
+        for(int i = 0; i < numSlots; i++) {
+            if (!isSlotUsed(i)) {
+                // find first empty slot
+                tuples[i] = t;
+                markSlotUsed(i, true);
+
+                // set tuple's record id
+                t.setRecordId(new RecordId(pid, i));
+                return;
+            }
+        }
     }
 
     /**
@@ -270,7 +293,9 @@ public class HeapPage implements Page {
      */
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
-	// not necessary for lab1
+	    // not necessary for lab1
+        this.isDirty = dirty;
+        this.dirtyTid = tid;
     }
 
     /**
@@ -278,8 +303,8 @@ public class HeapPage implements Page {
      */
     public TransactionId isDirty() {
         // some code goes here
-	// Not necessary for lab1
-        return null;      
+	    // Not necessary for lab1
+        return isDirty ? dirtyTid : null;
     }
 
     /**
@@ -310,6 +335,16 @@ public class HeapPage implements Page {
     private void markSlotUsed(int i, boolean value) {
         // some code goes here
         // not necessary for lab1
+        int idx = i / 8;
+        if (idx < 0 || idx >= getNumTuples()) {
+            throw new RuntimeException("Out of boundary");
+        }
+
+        if (value) {
+            header[idx] |= (1 << (i % 8));
+        } else {
+            header[idx] &= ~(1 << (i % 8));
+        }
     }
 
     /**
