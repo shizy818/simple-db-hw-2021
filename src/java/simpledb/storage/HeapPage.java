@@ -353,9 +353,13 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return Arrays.asList(tuples).stream()
-                .filter(it -> it != null)
-                .iterator();
+        List<Tuple> tupleArray = new ArrayList<>();
+        for (int i = 0; i < tuples.length; i++) {
+            if (this.isSlotUsed(i)) {
+                tupleArray.add(tuples[i]);
+            }
+        }
+        return tupleArray.iterator();
     }
 
 }
