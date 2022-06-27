@@ -10,10 +10,7 @@ import simpledb.transaction.TransactionId;
 import javax.xml.crypto.Data;
 import java.io.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -87,8 +84,8 @@ public class BufferPool {
         if (buffer.containsKey(pid))
             return buffer.get(pid);
 
-        if (buffer.size() >= numPages) {
-            throw new DbException("more than buffer pool capacity");
+        if (buffer.size() == numPages) {
+            this.evictPage();
         }
 
         // add page to buffer
@@ -207,7 +204,16 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        try {
+            for (Page pg : buffer.values()) {
+                if (pg.isDirty() != null) {
+                    this.flushPage(pg.getId());
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -221,6 +227,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        buffer.remove(pid);
     }
 
     /**
@@ -230,6 +237,12 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Page page = buffer.get(pid);
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        // mark clean
+        page.markDirty(false, null);
+        // write to disk
+        file.writePage(page);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -246,6 +259,21 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        try {
+            Iterator<PageId> iterator = buffer.keySet().iterator();
+            while(iterator.hasNext()) {
+                PageId pid = iterator.next();
+                Page page = buffer.get(pid);
+                if (page.isDirty() != null) {
+                    this.flushPage(pid);
+                }
+                this.discardPage(pid);
+                break;
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new DbException(ex.getMessage());
+        }
     }
 
 }
