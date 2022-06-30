@@ -12,7 +12,7 @@ public class IntHistogram {
 
     private int nTups;
     private int[] h_b;
-    private double w_b;
+    private int w_b;
 
     /**
      * Create a new IntHistogram.
@@ -39,7 +39,7 @@ public class IntHistogram {
         this.nTups = 0;
         this.h_b = new int[buckets];
         // 加1保证插入max的时候不会越界
-        this.w_b = (max - min + 1) / (1.0 * buckets);
+        this.w_b = (int) Math.ceil((max - min + 1.0) / buckets);
     }
 
     // helper func to get indx of a value v
@@ -47,7 +47,7 @@ public class IntHistogram {
         if (v < min) return -1;
         if (v > max) return buckets;
 
-        return (int) Math.floor((v - min) / w_b);
+        return (v - min) / w_b;
     }
 
     /**
@@ -57,8 +57,9 @@ public class IntHistogram {
     public void addValue(int v) {
     	// some code goes here
         int index = getIndex(v);
-        if (index < 0 || index > buckets)
+        if (index < 0 || index > buckets) {
             return;
+        }
 
         this.h_b[index]++;
         this.nTups++;
@@ -81,7 +82,7 @@ public class IntHistogram {
         int idx = getIndex(v);
         switch (op) {
             case EQUALS:
-                cost = idx < 0 || idx >= buckets ? 0.0 : h_b[idx] / (nTups * w_b);
+                cost = idx < 0 || idx >= buckets ? 0.0 : h_b[idx] / (nTups * w_b * 1.0);
                 break;
             case NOT_EQUALS:
                 cost = 1 - estimateSelectivity(Predicate.Op.EQUALS, v);
@@ -94,7 +95,7 @@ public class IntHistogram {
                 }
                 b_f = h_b[idx] / (nTups * 1.0);
                 // 多出来一小部分和w_b的比例
-                b_r = (v - min - w_b * idx) / w_b;
+                b_r = (v - min - w_b * idx) / (w_b * 1.0);
                 cost += b_f * b_r;
                 break;
             case LESS_THAN_OR_EQ:
@@ -109,7 +110,7 @@ public class IntHistogram {
                 }
                 b_f = h_b[idx] / (nTups * 1.0);
                 // 多出来一小部分和w_b的比例
-                b_r = (min + w_b * (idx + 1) - v) / w_b;
+                b_r = (min + w_b * (idx + 1) - v) / (w_b * 1.0);
                 cost += b_f * b_r;
                 break;
             case GREATER_THAN_OR_EQ:

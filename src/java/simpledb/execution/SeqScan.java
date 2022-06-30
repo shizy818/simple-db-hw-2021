@@ -139,4 +139,9 @@ public class SeqScan implements OpIterator {
         // some code goes here
         dbFileIterator.rewind();
     }
+
+    public int numPages() {
+        HeapFile file = (HeapFile) Database.getCatalog().getDatabaseFile(tableId);
+        return file.numPages();
+    }
 }

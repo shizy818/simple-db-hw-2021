@@ -122,4 +122,14 @@ public class Tuple implements Serializable {
         // some code goes here
         this.tupleDesc = td;
     }
+
+    // Copies the following tuple
+    public Tuple clone() {
+        Tuple copy = new Tuple(this.getTupleDesc());
+        copy.setRecordId(this.getRecordId());
+        for (int i = 0; i < this.getTupleDesc().numFields(); i++) {
+            copy.setField(i, this.getField(i));
+        }
+        return copy;
+    }
 }

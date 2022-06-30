@@ -6,6 +6,7 @@ import simpledb.execution.Predicate;
 import simpledb.execution.SeqScan;
 import simpledb.storage.*;
 import simpledb.transaction.Transaction;
+import simpledb.transaction.TransactionId;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -68,6 +69,14 @@ public class TableStats {
      */
     static final int NUM_HIST_BINS = 100;
 
+    private int tableId;
+    private int ioCostPerPage;
+    private int nTups;
+    // Or use DbFile.iterator instead
+    private SeqScan scan;
+    // Or use Map<Integer, Field> to store min & max values
+    private Tuple min, max;
+
     /**
      * Create a new TableStats object, that keeps track of statistics on each
      * column of a table
@@ -87,6 +96,39 @@ public class TableStats {
         // necessarily have to (for example) do everything
         // in a single scan of the table.
         // some code goes here
+        this.tableId = tableid;
+        this.ioCostPerPage = ioCostPerPage;
+        this.scan = new SeqScan(new TransactionId(), this.tableId);
+
+        try {
+            scan.open();
+            while(scan.hasNext()) {
+                nTups++;
+                Tuple tup = scan.next();
+
+                if (this.nTups == 1) {
+                    min = tup.clone();
+                    max = tup.clone();
+                    continue;
+                }
+
+                for(int i = 0; i < scan.getTupleDesc().numFields(); i++) {
+                    Field field = tup.getField(i);
+                    Field minField = min.getField(i);
+                    Field maxField = max.getField(i);
+
+                    if (field.compare(Predicate.Op.LESS_THAN, minField)) {
+                        min.setField(i, field);
+                    }
+
+                    if (field.compare(Predicate.Op.GREATER_THAN, maxField)) {
+                        max.setField(i, field);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     /**
@@ -103,7 +145,7 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        return 0;
+        return ioCostPerPage * scan.numPages();
     }
 
     /**
@@ -117,7 +159,7 @@ public class TableStats {
      */
     public int estimateTableCardinality(double selectivityFactor) {
         // some code goes here
-        return 0;
+        return (int) (this.totalTuples() * selectivityFactor);
     }
 
     /**
@@ -150,7 +192,41 @@ public class TableStats {
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // some code goes here
-        return 1.0;
+        if (this.scan == null) {
+            throw new RuntimeException("Missing db iterator");
+        }
+
+        TupleDesc tupDesc = this.scan.getTupleDesc();
+
+        try {
+            scan.rewind();
+
+            switch (tupDesc.getFieldType(field)) {
+                case INT_TYPE:
+                    int minVal = ((IntField) this.min.getField(field)).getValue();
+                    int maxVal = ((IntField) this.max.getField(field)).getValue();
+                    IntHistogram intHist = new IntHistogram(NUM_HIST_BINS, minVal, maxVal);
+                    while (scan.hasNext()) {
+                        IntField intField = (IntField) scan.next().getField(field);
+                        intHist.addValue(intField.getValue());
+                    }
+                    return intHist.estimateSelectivity(op, ((IntField) constant).getValue());
+
+                case STRING_TYPE:
+                    StringHistogram strHist = new StringHistogram(NUM_HIST_BINS);
+                    while (scan.hasNext()) {
+                        StringField stringField = (StringField) scan.next().getField(field);
+                        strHist.addValue(stringField.getValue());
+                    }
+                    return strHist.estimateSelectivity(op, ((StringField) constant).getValue());
+                default:
+                    throw new RuntimeException("Unsupported type");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return -1;
     }
 
     /**
@@ -158,7 +234,7 @@ public class TableStats {
      * */
     public int totalTuples() {
         // some code goes here
-        return 0;
+        return this.nTups;
     }
 
 }
