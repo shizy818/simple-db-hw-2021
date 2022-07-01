@@ -130,7 +130,14 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+
+            /*
+                cost1 - scancost(t1)
+                cost2 - scancost(t2)
+                card1 - ntup(t1)
+                card2 - ntup(t2)
+            */
+            return cost1 + card1 * cost2 /* IO cost */ + card1 * card2 /* CPU cost */;
         }
     }
 
@@ -176,6 +183,24 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // some code goes here
+        if (joinOp == Predicate.Op.EQUALS) {
+            if (t1pkey || t2pkey) {
+                // 存在主键
+                if (t1pkey && t2pkey)
+                    card = Math.min(card1, card2);
+
+                if (t1pkey && !t2pkey)
+                    card = card2;
+
+                if (!t1pkey && t2pkey)
+                    card = card1;
+            } else {
+                // 没有主键
+                card = Math.max(card1, card2);
+            }
+        } else {
+            card = (int) (0.3 * card1 * card2);
+        }
         return card <= 0 ? 1 : card;
     }
 
@@ -238,7 +263,29 @@ public class JoinOptimizer {
 
         // some code goes here
         //Replace the following
-        return joins;
+        PlanCache optJoin = new PlanCache();
+        Set<LogicalJoinNode> nodes = new HashSet<LogicalJoinNode>(joins);
+
+        for(int i = 1; i <= nodes.size(); i++) {
+            Set<Set<LogicalJoinNode>> subsets = this.enumerateSubsets(joins, i);
+            for(Set<LogicalJoinNode> subset: subsets) {
+                // dummy best plan
+                CostCard bestPlan = new CostCard();
+                bestPlan.cost = Double.MAX_VALUE;
+                bestPlan.card = Integer.MAX_VALUE;
+
+                for(LogicalJoinNode node: subset) {
+                    CostCard card = this.computeCostAndCardOfSubplan(
+                            stats, filterSelectivities, node, subset, bestPlan.cost, optJoin);
+                    if (card != null && card.cost < bestPlan.cost) {
+                        bestPlan = card;
+                    }
+                }
+                optJoin.addPlan(subset, bestPlan.cost, bestPlan.card, bestPlan.plan);
+            }
+        }
+
+        return optJoin.getOrder(nodes);
     }
 
     // ===================== Private Methods =================================
